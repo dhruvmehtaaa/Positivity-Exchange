@@ -4,16 +4,13 @@ use std::{
 };
 
 use crossterm::{
-    event::{DisableMouseCapture, EnableMouseCapture, Event, EventStream, KeyCode, KeyEventKind},
+    event::{DisableMouseCapture, EnableMouseCapture, Event, EventStream},
     execute,
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
 use ratatui::prelude::*;
-use state::{App, InputMode};
+use state::App;
 use tokio_stream::StreamExt;
-
-
-use state::{App, InputMode};
 
 mod state;
 mod ui;
@@ -55,43 +52,15 @@ async fn run(
 
     loop {
         tokio::select! {
-            // Tick to terminate the select every N milliseconds
             _ = ticker.tick() => (),
-            // Catch and handle crossterm events
             Some(Ok(Event::Key(key))) = crossterm_events.next() => {
-                match app.input_mode {
-                    InputMode::Normal => match key.code {
-                        KeyCode::Char('e') => {
-                            app.input_mode = InputMode::Editing;
-                        }
-                        KeyCode::Char('q') => {
-                            return Ok(());
-                        }
-                        _ => {}
-                    },
-                    InputMode::Editing if key.kind == KeyEventKind::Press => match key.code {
-                        KeyCode::Enter => app.submit_message(),
-                        KeyCode::Char(to_insert) => {
-                            app.enter_char(to_insert);
-                        }
-                        KeyCode::Backspace => {
-                            app.delete_char();
-                        }
-                        KeyCode::Left => {
-                            app.move_cursor_left();
-                        }
-                        KeyCode::Right => {
-                            app.move_cursor_right();
-                        }
-                        KeyCode::Esc => {
-                            app.input_mode = InputMode::Normal;
-                        }
-                        _ => {}
-                    },
-                    _ => {}
+                
+                if let Err(_) = app.handle_event(key) {
+                    return Ok(());
                 }
             }
         }
+
         terminal.draw(|frame| ui::render_app_too_frame(frame, &mut app))?;
     }
 }

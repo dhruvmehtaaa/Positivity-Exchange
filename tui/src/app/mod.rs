@@ -1,44 +1,44 @@
-use crossterm::event::{KeyCode, KeyEvent, KeyEventKind};
+use crossterm::event::{KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
 
-pub enum InputMode {
+use self::termination::{Interrupted, Terminator};
+
+pub(crate) mod termination;
+
+pub(crate) enum InputMode {
     Normal,
     Editing,
 }
 
-pub struct App {
+pub(crate) struct App {
+    terminator: Terminator,
     pub(crate) input: String,
     pub(crate) cursor_position: usize,
     pub(crate) input_mode: InputMode,
     pub(crate) messages: Vec<String>,
 }
 
-impl Default for App {
-    fn default() -> App {
+impl App {
+    pub fn new(terminator: Terminator) -> App {
         App {
+            terminator,
             input: String::new(),
             input_mode: InputMode::Normal,
             messages: Vec::new(),
             cursor_position: 0,
         }
     }
-}
 
-impl App {
-    pub(crate) fn handle_event(&mut self, key: KeyEvent) -> anyhow::Result<()> {
+    pub(crate) fn handle_key_event(&mut self, key: KeyEvent) {
         match self.input_mode {
             InputMode::Normal => match key.code {
                 KeyCode::Char('e') => {
                     self.input_mode = InputMode::Editing;
                 }
                 KeyCode::Char('q') => {
-                    return Err(anyhow::anyhow!("Quit"));
+                    let _ = self.terminator.terminate(Interrupted::UserInt);
                 }
-                KeyCode::Char('c')
-                    if key
-                        .modifiers
-                        .contains(crossterm::event::KeyModifiers::CONTROL) =>
-                {
-                    return Err(anyhow::anyhow!("Quit"));
+                KeyCode::Char('c') if key.modifiers.contains(KeyModifiers::CONTROL) => {
+                    let _ = self.terminator.terminate(Interrupted::UserInt);
                 }
                 _ => {}
             },
@@ -63,8 +63,6 @@ impl App {
             },
             _ => {}
         }
-
-        Ok(())
     }
 
     fn move_cursor_left(&mut self) {
@@ -86,11 +84,13 @@ impl App {
     fn delete_char(&mut self) {
         let is_not_cursor_leftmost = self.cursor_position != 0;
         if is_not_cursor_leftmost {
+
             let current_index = self.cursor_position;
             let from_left_to_current_index = current_index - 1;
 
             let before_char_to_delete = self.input.chars().take(from_left_to_current_index);
             let after_char_to_delete = self.input.chars().skip(current_index);
+
             self.input = before_char_to_delete.chain(after_char_to_delete).collect();
             self.move_cursor_left();
         }

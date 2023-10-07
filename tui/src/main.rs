@@ -1,19 +1,32 @@
-use app::{termination::create_termination, App};
-use std::sync::Arc;
-use tokio::sync::RwLock;
+use state_store::StateStore;
+use termination::create_termination;
+use ui_management::UiManager;
 
-mod app;
-mod cli;
+mod state_store;
+mod termination;
+mod ui_management;
+
+use termination::{Interrupted, Terminator};
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    let (terminator, interrupt_rx) = create_termination();
-    let app = Arc::new(RwLock::new(App::new(terminator.clone())));
+    let (terminator, mut interrupt_rx) = create_termination();
+    let (state_store, state_rx) = StateStore::new();
+    let (ui_manager, action_rx) = UiManager::new();
 
     tokio::try_join!(
-        cli::main_loop(interrupt_rx.resubscribe(), app.clone()),
-        app::main_loop(interrupt_rx.resubscribe(), app),
+        state_store.main_loop(terminator, action_rx, interrupt_rx.resubscribe()),
+        ui_manager.main_loop(state_rx, interrupt_rx.resubscribe()),
     )?;
+
+    if let Ok(reason) = interrupt_rx.recv().await {
+        match reason {
+            Interrupted::UserInt => println!("exited per user request"),
+            Interrupted::OsSigInt => println!("exited because of an os sig int"),
+        }
+    } else {
+        println!("exited because of an unexpected error");
+    }
 
     Ok(())
 }

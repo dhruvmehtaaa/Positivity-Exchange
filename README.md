@@ -43,7 +43,7 @@ Execute the e2e test for client and server with the following command: `cargo te
 Here's a simplified pseudocode version of the [e2e test code](./comms/tests/e2e_server_and_client_transport.rs):
 
 ```rust
-// full e2e test code: src/tests/e2e_server_and_client_transport.rs
+// full e2e test code: comms/tests/e2e_server_and_client_transport.rs
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
